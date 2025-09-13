@@ -141,10 +141,18 @@ try {
     $mime_type = finfo_file($finfo, $file_path);
     finfo_close($finfo);
     
+    // Ensure WebM files get proper MIME type for audio playback
+    $extension = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
+    if ($extension === 'webm' && strpos($mime_type, 'audio') !== false) {
+        $mime_type = 'audio/webm; codecs="opus"';
+    }
+    
     // Output the file with appropriate headers
     header('Content-Type: ' . $mime_type);
     header('Content-Disposition: inline; filename="' . basename($filename) . '"');
     header('Content-Length: ' . filesize($file_path));
+    header('Accept-Ranges: bytes');
+    header('Cache-Control: public, max-age=3600');
     
     // Disable output buffering to handle large files better
     if (ob_get_level()) {

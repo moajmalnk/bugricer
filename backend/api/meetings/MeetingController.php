@@ -1,7 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../BaseAPI.php';
-require_once __DIR__ . '/../Utils.php';
+require_once __DIR__ . '/../../config/utils.php';
 
 class MeetingController extends BaseAPI {
     public function __construct() {

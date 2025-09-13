@@ -69,7 +69,7 @@ $contentTypes = [
     'mp3' => 'audio/mpeg',
     'm4a' => 'audio/mp4',
     'ogg' => 'audio/ogg',
-    'webm' => 'audio/webm'
+    'webm' => 'audio/webm; codecs="opus"'
 ];
 
 if (isset($contentTypes[$extension])) {
@@ -80,10 +80,19 @@ if (isset($contentTypes[$extension])) {
     error_log("Audio file served: $filePath with Content-Type: application/octet-stream");
 }
 
-// Set headers for audio streaming
+// Set headers for audio streaming with better WebM support
 header('Accept-Ranges: bytes');
 header('Content-Length: ' . filesize($requestedPathReal));
 header('Cache-Control: public, max-age=3600');
+header('X-Content-Type-Options: nosniff');
+
+// Additional headers for WebM files
+if ($extension === 'webm') {
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET, HEAD, OPTIONS');
+    header('Access-Control-Allow-Headers: Range, Content-Type, Accept, Origin, X-Requested-With');
+    header('Access-Control-Expose-Headers: Content-Length, Content-Range');
+}
 
 // Output the file
 readfile($requestedPathReal);

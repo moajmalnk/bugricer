@@ -146,7 +146,7 @@ class Database {
         // For local environment, try simple connection first
         if ($this->isLocalEnvironment()) {
             try {
-                $dsn = "mysql:host=" . $this->host . ";dbname=" . $this->db_name . ";charset=utf8mb4";
+                $dsn = "mysql:host=" . $this->host . ";port=3306;unix_socket=/Applications/XAMPP/xamppfiles/var/mysql/mysql.sock;dbname=" . $this->db_name . ";charset=utf8mb4";
                 error_log("Attempting local connection to: " . $dsn);
                 
                 $this->conn = new PDO($dsn, $this->username, $this->password, [

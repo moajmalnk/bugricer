@@ -18,6 +18,7 @@ class SignalingServer implements MessageComponentInterface {
 
     public function onOpen(ConnectionInterface $conn) {
         $this->clients->attach($conn);
+        echo "Client connected: " . $conn->resourceId . "\n";
     }
 
     public function onMessage(ConnectionInterface $from, $msg) {
@@ -47,6 +48,7 @@ class SignalingServer implements MessageComponentInterface {
     }
 
     public function onClose(ConnectionInterface $conn) {
+        echo "Client disconnected: " . $conn->resourceId . "\n";
         $this->clients->detach($conn);
         foreach ($this->rooms as $code => &$members) {
             if (isset($members[$conn->resourceId])) {
@@ -59,6 +61,7 @@ class SignalingServer implements MessageComponentInterface {
     }
 
     public function onError(ConnectionInterface $conn, \Exception $e) {
+        echo "WebSocket error: " . $e->getMessage() . "\n";
         $conn->close();
     }
 
