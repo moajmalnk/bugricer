@@ -20,7 +20,7 @@ export const getMessages = (code: string, limit = 100) => {
   return api.get(`/meetings/messages.php`, { params: { code, limit } });
 };
 
-export const sendMessage = (code: string, message: string, senderId?: number, senderName?: string) => {
+export const sendMessage = (code: string, message: string, senderId?: string, senderName?: string) => {
   return api.post(`/meetings/messages.php`, { code, message, senderId, senderName });
 };
 

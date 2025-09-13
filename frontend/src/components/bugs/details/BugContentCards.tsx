@@ -43,6 +43,16 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
     /^https?:\/\//i.test(path)
       ? path
       : `${apiBaseUrl}/audio.php?path=${encodeURIComponent(path)}`;
+  
+  const buildFallbackAudioUrl = (path: string, name?: string) => {
+    const base = `${apiBaseUrl}/get_attachment.php?path=${encodeURIComponent(
+      path
+    )}`;
+    const withName = name ? `${base}&name=${encodeURIComponent(name)}` : base;
+    // Also include bug_id for better compatibility
+    return `${withName}&bug_id=${encodeURIComponent(bug.id)}`;
+  };
+  
   const buildDownloadUrl = (path: string, name?: string) => {
     const base = `${apiBaseUrl}/get_attachment.php?path=${encodeURIComponent(
       path
@@ -141,7 +151,7 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
     extractDurations();
   }, [bug.attachments]);
 
-  const playVoiceNote = (attachmentId: string, audioUrl: string) => {
+  const playVoiceNote = (attachmentId: string, audioUrl: string, attachment?: any) => {
     console.log("=== BUG DETAILS PLAY VOICE NOTE DEBUG ===");
     console.log("Playing voice note:", attachmentId, "URL:", audioUrl);
 
@@ -173,6 +183,9 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
     if (!audioRefs.current[attachmentId]) {
       console.log("🎵 Creating new audio element for:", attachmentId);
       const audio = new Audio();
+      
+      // Set preload to help with WebM files
+      audio.preload = 'metadata';
 
       audio.onended = () => {
         console.log("🏁 Audio playback ended for:", attachmentId);
@@ -187,6 +200,7 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
           networkState: audio.networkState,
           readyState: audio.readyState,
           mediaError: audio.error,
+          codecSupport: audio.canPlayType('audio/webm; codecs="opus"'),
         });
         setPlayingVoiceNote(null);
       };
@@ -219,6 +233,17 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
       audioRefs.current[attachmentId] = audio;
     }
 
+    // Check browser support for WebM audio before attempting playback
+    const audioElement = audioRefs.current[attachmentId];
+    const webmSupport = audioElement.canPlayType('audio/webm; codecs="opus"');
+    const webmBasicSupport = audioElement.canPlayType('audio/webm');
+    
+    console.log("🔍 Browser codec support check:", {
+      webmWithOpus: webmSupport,
+      webmBasic: webmBasicSupport,
+      audioUrl: audioUrl
+    });
+
     // Set the audio source and play
     console.log("🎯 Setting audio source and playing:", attachmentId);
     audioRefs.current[attachmentId].src = audioUrl;
@@ -243,24 +268,43 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
             readyState: audioRefs.current[attachmentId].readyState,
           });
 
-          // Try fallback: download and play as blob
-          console.log("🔄 Trying fallback: download as blob");
-          fetch(audioUrl)
-            .then((response) => response.blob())
-            .then((blob) => {
-              const blobUrl = URL.createObjectURL(blob);
-              console.log("🔄 Created blob URL:", blobUrl);
-              audioRefs.current[attachmentId].src = blobUrl;
-              return audioRefs.current[attachmentId].play();
-            })
-            .then(() => {
-              console.log("✅ Fallback playback successful");
-              setPlayingVoiceNote(attachmentId);
-            })
-            .catch((fallbackError) => {
-              console.error("❌ Fallback also failed:", fallbackError);
-              setPlayingVoiceNote(null);
-            });
+          // Try fallback: use get_attachment.php endpoint (which works for downloads)
+          if (attachment) {
+            console.log("🔄 Trying fallback: using get_attachment.php endpoint");
+            const fallbackUrl = buildFallbackAudioUrl(attachment.file_path, attachment.file_name);
+            console.log("🔄 Fallback URL:", fallbackUrl);
+            
+            audioRefs.current[attachmentId].src = fallbackUrl;
+            return audioRefs.current[attachmentId].play()
+              .then(() => {
+                console.log("✅ Fallback playback successful");
+                setPlayingVoiceNote(attachmentId);
+              })
+              .catch((fallbackError) => {
+                console.error("❌ Fallback also failed:", fallbackError);
+                // Last resort: try blob download
+                console.log("🔄 Last resort: download as blob");
+                fetch(fallbackUrl)
+                  .then((response) => response.blob())
+                  .then((blob) => {
+                    const blobUrl = URL.createObjectURL(blob);
+                    console.log("🔄 Created blob URL:", blobUrl);
+                    audioRefs.current[attachmentId].src = blobUrl;
+                    return audioRefs.current[attachmentId].play();
+                  })
+                  .then(() => {
+                    console.log("✅ Blob fallback successful");
+                    setPlayingVoiceNote(attachmentId);
+                  })
+                  .catch((blobError) => {
+                    console.error("❌ All fallbacks failed:", blobError);
+                    setPlayingVoiceNote(null);
+                  });
+              });
+          } else {
+            console.error("❌ No attachment data for fallback");
+            setPlayingVoiceNote(null);
+          }
         });
     }, 100);
   };
@@ -531,7 +575,9 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
                   filePath: attachment.file_path,
                   apiBaseUrl: apiBaseUrl,
                   audioUrl: audioUrl,
+                  fallbackUrl: buildFallbackAudioUrl(attachment.file_path, attachment.file_name),
                   isPlaying: isPlaying,
+                  attachment: attachment
                 });
 
                 return (
@@ -557,7 +603,7 @@ export function BugContentCards({ bug }: BugContentCardsProps) {
                         onClick={() =>
                           isPlaying
                             ? pauseVoiceNote(attachment.id)
-                            : playVoiceNote(attachment.id, audioUrl)
+                            : playVoiceNote(attachment.id, audioUrl, attachment)
                         }
                         className="flex items-center gap-1"
                       >
